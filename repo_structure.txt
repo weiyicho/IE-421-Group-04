@@ -1,0 +1,48 @@
+AGI-Signal-Generator/
+├── strategies/
+│   ├── strategy_1_volatility_breakout.py
+│   ├── strategy_2_fear_fade.py
+│   ├── strategy_3_sentiment_swing.py
+│   └── strategy_4_rolling_reversal.py
+│
+├── overlays/
+│   └── alpha_overlay.py
+│
+├── backtest/
+│   ├── backtester.py
+│   ├── performance_metrics.py
+│   └── data_handler.py
+│
+├── allocators/
+│   ├── equal_weight.py
+│   ├── sharpe_weighted.py
+│   └── hrp_allocator.py
+│
+├── execution/
+│   └── execution_broker.py        ← IBKR integration
+│
+├── agents/
+│   ├── agent_orchestrator.py     ← future: LLM/Nemotron
+│   └── strategy_llm_engine.py
+│
+├── ensemble.py                   ← Combines strategies + weights
+├── run_pipeline.py               ← Full run controller
+├── config.py                     ← Strategy configs & toggles
+│
+├── notebooks/
+│   ├── strategy_tuning.ipynb
+│   ├── overlay_analysis.ipynb
+│   └── ensemble_vs_baseline.ipynb
+│
+├── reports/
+│   ├── performance_summary.pdf
+│   └── strategy_logs/
+│       ├── strategy1_trades.csv
+│       └── ensemble_output.csv
+│
+├── datasets/                     ← Optional: external data
+│   └── custom_factors.csv
+│
+├── requirements.txt
+├── README.md
+└── .gitignore
