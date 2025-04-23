@@ -1,14 +1,28 @@
 from data_fetch import fetch_intraday_data
-from strategy import gpt4_generate_strategy, gpt4_improve_strategy
+from agent.strategy import generate_strategy
+from agent.eval import backtest_strategy, generate_report
 
 
-while not success:
-    data = fetch_intraday_data('SPY')
-    strategy_code = gpt4_generate_strategy(data)
-    # backtest strat
-    """
-    if **some performance metric***:
-        success = True
-    else:
-        strategy_code = gpt4_improve_strategy(performance)
-    """
+def run_agent(
+    prompt: str = "Come up with a profitable strategy on SPY",
+    ticker: str = "SPY",
+    interval: str = "5m",
+    period: str = "5d",
+    use_cache: bool = True
+):
+    print(f"\n[🔍] Step 1: Fetching Data for {ticker}...")
+    data = fetch_intraday_data(ticker, interval, period, use_cache)
+    if data.empty:
+        print("[❌] No data available. Exiting agent.")
+        return
+
+    print(f"\n[🧠] Step 2: Generating Strategy...")
+    strategy_code, strategy_description = generate_strategy(data, prompt)
+
+    print(f"\n[📈] Step 3: Backtesting Strategy...")
+    results = backtest_strategy(data, strategy_code)
+
+    print(f"\n[📝] Step 4: Generating Report...")
+    generate_report(results, strategy_description)
+
+    print("\n✅ Agent run complete.")

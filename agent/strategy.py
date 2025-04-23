@@ -1,67 +1,71 @@
 import openai
 import pandas as pd
+import os 
+from dotenv import load_dotenv
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+load_dotenv()
+
+llm = ChatOpenAI(
+    model="nvidia/llama-3.1-nemotron-70b-instruct",
+    base_url="https://integrate.api.nvidia.com/v1",
+    api_key= os.getenv("NVIDIA_API_KEY"),
+    temperature=0.5,
+)
+
+# Prompt to generate a backtesting.py-compatible strategy
+strategy_prompt = PromptTemplate.from_template("""
+You are a highly skilled and compeptive quantitative trading developer with a strong background in algorithmic trading and machine learning.
+                                               
 
 
-def summarize_data(price_data: pd.DataFrame) -> str:
-    """
-    Generate a textual summary of the intraday price data
-    to be passed to the LLM.
-    """
-    description = price_data.describe().round(2).to_string()
-    
-    # Add example indicators
-    price_data["returns"] = price_data["Close"].pct_change()
-    volatility = price_data["returns"].std()
-    rsi_sample = price_data["Close"].rolling(window=14).apply(
-        lambda x: 100 - (100 / (1 + (x.diff().clip(lower=0).sum() / abs(x.diff().clip(upper=0)).sum()))), raw=False
-    ).dropna()
-    
-    summary = f"""
-        Intraday OHLCV data summary for SPY (5-minute bars over 5 days):
-        - Volatility (std of returns): {volatility:.4f}
-        - RSI (last 5 values): {rsi_sample.tail().round(2).to_dict()}
-        - Basic stats:
-        {description}
-    """
-    return summary
+Create a **profitable intraday trading strategy** for the U.S. stock {ticker}, using the provided csv of OHLCV data.
 
-def gpt4_generate_strategy(data: pd.DataFrame, ticker: str = "SPY") -> str:
-    """
-    Uses GPT-4 to generate a trading strategy based on intraday data.
+First, analyze the data and identify potential patterns or trends that could be exploited for profit.
 
-    Parameters:
-    - price_data: DataFrame with OHLCV intraday data
-    - ticker: the symbol (for context in the prompt)
+                                               
+Instructions:
+1. Write a short explanation of your trading logic and rationale.
+2. Then provide a full Python class that inherits from `backtesting.Strategy`, using:
+   - `init(self)` for indicator setup
+   - `next(self)` for trade logic
 
-    Returns:
-    - Python code string for the strategy
-    """
-    # Get a simple summary of the data to give the model context
-    preview = data.tail(30).to_csv(index=False)
+Assume these imports are already provided:
+```python
+from backtesting import Strategy
+from backtesting.lib import crossover
+from backtesting.test import SMA
+Return only:
+A description of the strategy and the correspondingPython code inside a python ... block """)
 
-    prompt = f"""
-        You are a quantitative trader building an intraday trading strategy for the US stock {ticker}, using 5-minute OHLCV price data.
+chain = strategy_prompt | llm
 
-        Here is a recent snippet of the intraday price data (last 30 rows):
-
-        {preview}
-
-        Your task:
-        - Create a trading strategy in Python using technical indicators such as RSI, VWAP, or EMA.
-        - Use `pandas` and assume `price_data` is already available as a DataFrame with columns: ['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume']
-        - Generate clear buy/sell signals and store them in a new 'signal' column (1 = buy, -1 = sell, 0 = hold)
-        - Keep the code simple, readable, and executable
-
-        Respond ONLY with the code (no explanations).
-    """
+def generate_strategy(df, user_prompt="Come up with a profitable strategy on SPY"): 
+    # Extract ticker symbol from user prompt
+    print(f"[INFO] Analyzing data for strategy generation...")
+    if "on" in user_prompt:
+        ticker = user_prompt.split("on")[-1].strip().upper()
+    else:
+        ticker = "SPY"
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        return response['choices'][0]['message']['content'].strip()
+        # Run Langchain chain
+        print(f"[INFO] Building strategy for {ticker}...")
+        response = chain.invoke({"ticker": ticker})
+        text = response["text"] if isinstance(response, dict) else str(response)
+
+        if "```" in text:
+            parts = text.split("```")
+            description = parts[0].strip()
+            code_block = next((part for part in parts if "class" in part), "# No valid strategy code returned")
+            code = code_block.replace("python", "").strip()
+        else:
+            description = text.strip()
+            code = "# No code block returned by LLM."
+        print(f"[INFO] Strategy built!")
+        return code, description
+
     except Exception as e:
-        print(f"[ERROR] Strategy generation failed: {e}")
-        return ""
+        print(f"[ERROR] LLM strategy generation failed: {e}")
+        return "# LLM generation error", "Strategy generation failed."
